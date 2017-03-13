@@ -61,16 +61,25 @@ module.exports = function (grunt) {
     var tasks = _.map(options.tasks || [options], function (task) {
       return function (callback) {
         var data = sharp(image.src);
+        sharp(image.src).metadata().then(function(metadata) {
         _.map(task, function (args, op) {
+          var width = 0;
           if (data[op]) {
+
+            if(args === '3x') {
+              args = metadata.width;
+            } else if( args === '2x') {
+              args = Math.round(metadata.width / 2);
+            } else if( args === '1x') {
+              args = Math.round(metadata.width / 3);
+            }
+
             data[op].apply(data, [].concat(args));
           }
           else if (op !== 'rename') {
             grunt.log.warn('Skipping unknown operation: ' + op);
           }
         });
-
-        writeImage(data, image, task.rename, callback);
       };
     });
 
