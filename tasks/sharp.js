@@ -65,7 +65,6 @@ module.exports = function (grunt) {
         _.map(task, function (args, op) {
             var width = 0;
             if (data[op]) {
-
               if(args === '3x') {
                 args = metadata.width;
               } else if( args === '2x') {
@@ -73,13 +72,14 @@ module.exports = function (grunt) {
               } else if( args === '1x') {
                 args = Math.round(metadata.width / 3);
               }
-
               data[op].apply(data, [].concat(args));
             }
             else if (op !== 'rename') {
               grunt.log.warn('Skipping unknown operation: ' + op);
             }
-          });
+        });
+        writeImage(data, image, task.rename, callback);
+
         });
       };
     });
