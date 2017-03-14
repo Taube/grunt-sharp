@@ -4,8 +4,10 @@ module.exports = function (grunt) {
   var _ = grunt.util._;
   var path = require('path');
   var async = require('async');
+  var request = require('request');
   var chalk = require('chalk');
   var sharp = require('sharp');
+  var smartcrop = require('smartcrop-sharp');
 
   grunt.registerMultiTask('sharp', 'Resize images.', function () {
     modifyImages(getImages(this.files), this.options(), this.async());
@@ -61,9 +63,12 @@ module.exports = function (grunt) {
     var tasks = _.map(options.tasks || [options], function (task) {
       return function (callback) {
         var data = sharp(image.src);
+        var useSmartCrop = false;
+
         sharp(image.src).metadata().then(function(metadata) {
         _.map(task, function (args, op) {
             var width = 0;
+            
             if (data[op]) {
               if(args === '3x') {
                 args = metadata.width;
@@ -73,12 +78,18 @@ module.exports = function (grunt) {
                 args = Math.round(metadata.width / 3);
               }
               data[op].apply(data, [].concat(args));
-            }
-            else if (op !== 'rename') {
+            } else if (op === 'smartcrop') {
+              if(task.resize) {
+                useSmartCrop = true;
+              } else {
+                grunt.log.warn('You need to pass the output size when performing smartcrop');
+              }
+            } else if (op !== 'rename') {
               grunt.log.warn('Skipping unknown operation: ' + op);
             }
         });
-        writeImage(data, image, task.rename, callback);
+
+        writeImage(data, image, task.rename, useSmartCrop, callback);
 
         });
       };
@@ -93,7 +104,8 @@ module.exports = function (grunt) {
     });
   };
 
-  var writeImage = function (data, image, rename, callback) {
+  var writeImage = function (data, image, rename, useSmartCrop, callback) {
+
     var src = image.src;
     var ext = image.ext;
     var dest = image.dest;
@@ -101,18 +113,36 @@ module.exports = function (grunt) {
     var base = path.basename(dest, ext);
 
     grunt.file.mkdir(dir);
-
     dest = rename ? path.join(dir, processName(rename, {base: base, ext: ext.substr(1)})) : dest;
 
-    data.toFile(dest, function (err, info) {
-      if (err) {
-        return callback(err);
-      }
+    if (useSmartCrop) {
+      var width = data.options.width;
+      var height = data.options.height;
 
-      grunt.verbose.writeln('Images: ' + chalk.cyan(src) + ' -> ' + chalk.cyan(dest));
+      smartcrop.crop(src, {width: width, height: height}).then(function(result) {
+        var crop = result.topCrop;
+        sharp(src)
+        .extract({width: crop.width, height: crop.height, left: crop.x, top: crop.y})
+        .resize(width, height)
+        .toFile(dest, function (err, info) {
+          if (err) {
+            return callback(err);
+          }
+          grunt.verbose.writeln('Smartcrop: ' + chalk.cyan(src) + ' -> ' + chalk.cyan(dest));
+          callback(null, info);
+        });
+      });
 
-      callback(null, info);
-    });
+    } else {
+      data.toFile(dest, function (err, info) {
+        if (err) {
+          return callback(err);
+        }
+        grunt.verbose.writeln('Images: ' + chalk.cyan(src) + ' -> ' + chalk.cyan(dest));
+        callback(null, info);
+      });
+    } 
+
   };
 
   var processName = function (name, data) {

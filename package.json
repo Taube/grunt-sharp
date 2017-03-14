@@ -27,7 +27,8 @@
     "grunt": "^1.0.0",
     "grunt-contrib-clean": "^1.0.0",
     "grunt-contrib-jshint": "^1.0.0",
-    "grunt-contrib-nodeunit": "^1.0.0"
+    "grunt-contrib-nodeunit": "^1.0.0",
+    "smartcrop-sharp": "github:jwagner/smartcrop-sharp"
   },
   "peerDependencies": {
     "grunt": ">=0.4.0"
