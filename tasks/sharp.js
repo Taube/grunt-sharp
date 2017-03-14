@@ -64,6 +64,7 @@ module.exports = function (grunt) {
       return function (callback) {
         var data = sharp(image.src);
         var useSmartCrop = false;
+        var useArgs = {};
 
         sharp(image.src).metadata().then(function(metadata) {
         _.map(task, function (args, op) {
@@ -77,7 +78,12 @@ module.exports = function (grunt) {
               } else if( args === '1x') {
                 args = Math.round(metadata.width / 3);
               }
+
               data[op].apply(data, [].concat(args));
+
+              if(args[1])
+                useArgs = args[1];
+
             } else if (op === 'smartcrop') {
               if(task.resize) {
                 useSmartCrop = true;
@@ -89,7 +95,7 @@ module.exports = function (grunt) {
             }
         });
 
-        writeImage(data, image, task.rename, useSmartCrop, callback);
+        writeImage(data, image, task.rename, useSmartCrop, useArgs, callback);
 
         });
       };
@@ -104,7 +110,7 @@ module.exports = function (grunt) {
     });
   };
 
-  var writeImage = function (data, image, rename, useSmartCrop, callback) {
+  var writeImage = function (data, image, rename, useSmartCrop, args, callback) {
 
     var src = image.src;
     var ext = image.ext;
@@ -118,13 +124,23 @@ module.exports = function (grunt) {
     if (useSmartCrop) {
       var width = data.options.width;
       var height = data.options.height;
+      var overlay = data.options.overlay.file;
 
       smartcrop.crop(src, {width: width, height: height}).then(function(result) {
         var crop = result.topCrop;
-        sharp(src)
+        var extractedOutput = sharp(src)
         .extract({width: crop.width, height: crop.height, left: crop.x, top: crop.y})
-        .resize(width, height)
-        .toFile(dest, function (err, info) {
+        .resize(width, height);
+
+        if(overlay) {
+          if(args) {
+            extractedOutput.overlayWith(overlay, args);
+          } else {
+            extractedOutput.overlayWith(overlay);
+          }
+        }
+
+        extractedOutput.toFile(dest, function (err, info) {
           if (err) {
             return callback(err);
           }
